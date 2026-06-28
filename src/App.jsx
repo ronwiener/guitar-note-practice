@@ -1,6 +1,6 @@
 // src/App.jsx
 import { useState } from "react";
-import ToolBar from "./components/ToolBar";
+import Toolbar from "./components/ToolBar";
 import MusicStaff from "./components/MusicStaff";
 
 export default function App() {
