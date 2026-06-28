@@ -1,6 +1,6 @@
 // src/App.jsx
 import { useState } from "react";
-import Toolbar from "./components/ToolBar";
+import ToolBar from "./components/ToolBar";
 import MusicStaff from "./components/MusicStaff";
 
 export default function App() {
@@ -22,7 +22,7 @@ export default function App() {
 
   return (
     <div style={{ padding: 20 }}>
-      <Toolbar
+      <ToolBar
         settings={settings}
         setSettings={setSettings}
         onNewSheet={handleNewSheet}

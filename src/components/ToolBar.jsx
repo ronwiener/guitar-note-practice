@@ -1,5 +1,5 @@
 // src/components/Toolbar.jsx
-export default function Toolbar({ settings, setSettings, onNewSheet }) {
+export default function ToolBar({ settings, setSettings, onNewSheet }) {
   return (
     <div
       style={{
