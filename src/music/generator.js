@@ -20,6 +20,29 @@ const OPEN_POSITION_SCALE = [
   "g/5", // 1st String
 ];
 
+// src/music/generator.js
+
+// Add this back to the top of the file:
+const BASE_OPEN_SCALE = [
+  "e/3",
+  "f/3",
+  "g/3",
+  "a/3",
+  "b/3",
+  "c/4",
+  "d/4",
+  "e/4",
+  "f/4",
+  "g/4",
+  "a/4",
+  "b/4",
+  "c/5",
+  "d/5",
+  "e/5",
+  "f/5",
+  "g/5",
+];
+
 function rand(arr) {
   return arr[Math.floor(Math.random() * arr.length)];
 }
