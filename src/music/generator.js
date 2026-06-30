@@ -126,55 +126,79 @@ function generateDynamicChord(baseIndex) {
   return chordKeys.length > 0 ? chordKeys : [OPEN_POSITION_SCALE[baseIndex]];
 }
 
-export function generateMeasure(beats, beatValue = 4, isChordMode = false) {
+// src/music/generator.js
+
+export function generateMeasure(
+  beats,
+  beatValue = 4,
+  isChordMode = false,
+  keySignature = "C",
+  complexRhythms = false,
+) {
   const notes = [];
   let remainingTicks = beats * (4096 / beatValue);
 
-  let noteOptions =
-    Number(beatValue) === 8
-      ? [
-          { ticks: 1536, duration: "qd", hasDot: true },
-          { ticks: 1024, duration: "q", hasDot: false },
-          { ticks: 512, duration: "8", hasDot: false },
-        ]
-      : [
-          { ticks: 3072, duration: "hd", hasDot: true },
-          { ticks: 2048, duration: "h", hasDot: false },
-          { ticks: 1024, duration: "q", hasDot: false },
-        ];
+  const currentScalePool = getKeySignatureScale(keySignature);
+  let currentNoteIndex = Math.floor(Math.random() * currentScalePool.length);
 
-  const fallbackNote =
-    Number(beatValue) === 8
-      ? { ticks: 512, duration: "8", hasDot: false }
-      : { ticks: 1024, duration: "q", hasDot: false };
+  // 1. Establish duration option trees based on whether user wants complex rhythms
+  let noteOptions = [];
+  if (complexRhythms) {
+    // Mixes in Half, Quarters, Eighths, Quarter Rests, and Eighth Rests
+    noteOptions = [
+      { ticks: 2048, duration: "h", isRest: false },
+      { ticks: 1024, duration: "q", isRest: false },
+      { ticks: 1024, duration: "qr", isRest: true }, // Quarter Rest
+      { ticks: 512, duration: "8", isRest: false }, // Eighth Note
+      { ticks: 512, duration: "8r", isRest: true }, // Eighth Rest
+    ];
+  } else {
+    // Standard baseline patterns (No complex subdivisions or pauses)
+    noteOptions = [
+      { ticks: 2048, duration: "h", isRest: false },
+      { ticks: 1024, duration: "q", isRest: false },
+    ];
+  }
 
-  let currentNoteIndex = Math.floor(Math.random() * OPEN_POSITION_SCALE.length);
+  const fallbackNote = { ticks: 1024, duration: "q", isRest: false };
 
+  // 2. Generation Loop
   while (remainingTicks > 0) {
     const validOptions = noteOptions.filter((o) => o.ticks <= remainingTicks);
-    const choice = validOptions.length ? rand(validOptions) : fallbackNote;
+    if (validOptions.length === 0) {
+      // Emergency patch for trailing tiny spaces
+      remainingTicks = 0;
+      break;
+    }
 
-    currentNoteIndex = getNextMusicalNote(currentNoteIndex);
-
+    const choice = rand(validOptions);
     let finalKeys = [];
 
-    if (isChordMode) {
-      // 60% chance to build a mixed chord/interval structure, 40% chance to remain a single melodic note
-      if (Math.random() > 0.4) {
-        finalKeys = generateDynamicChord(currentNoteIndex);
-      } else {
-        finalKeys = [OPEN_POSITION_SCALE[currentNoteIndex]];
-      }
+    if (choice.isRest) {
+      // VexFlow draws a rest on the middle line ("b/4") when duration has an "r" modifier suffix
+      finalKeys = ["b/4"];
     } else {
-      // Regular melodic single notes mode
-      finalKeys = [OPEN_POSITION_SCALE[currentNoteIndex]];
+      currentNoteIndex = getNextMusicalNote(
+        currentNoteIndex,
+        currentScalePool.length,
+      );
+
+      if (isChordMode) {
+        // Only bundle chords on Quarters or Halves; isolated eighth-note chords are rare in standard sight reading
+        if (choice.ticks >= 1024 && Math.random() > 0.4) {
+          finalKeys = generateDynamicChord(currentNoteIndex, currentScalePool);
+        } else {
+          finalKeys = [currentScalePool[currentNoteIndex]];
+        }
+      } else {
+        finalKeys = [currentScalePool[currentNoteIndex]];
+      }
     }
 
     notes.push({
       clef: "treble",
       keys: finalKeys,
       duration: choice.duration,
-      hasDot: choice.hasDot,
     });
 
     remainingTicks -= choice.ticks;

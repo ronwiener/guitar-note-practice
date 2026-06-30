@@ -11,6 +11,7 @@ export default function App() {
     isReadingMode: false,
     isChordMode: false,
     keySignature: "C",
+    complexRhythms: "false",
   });
 
   // Create a simple incrementing counter to act as a refresh trigger
@@ -29,7 +30,7 @@ export default function App() {
       />
 
       <MusicStaff
-        key={`${settings.timeSignature}-${settings.isChordMode}-${settings.keySignature}-${refreshKey}`}
+        key={`${settings.timeSignature}-${settings.isChordMode}-${settings.keySignature}-${settings.complexRhythms}-${refreshKey}`}
         settings={settings}
       />
     </div>

@@ -47,15 +47,14 @@ export default function MusicStaff({ settings }) {
       Number(settings.timeSignature.split("/")[0]),
     );
     const initialBeatValue = Number(settings.timeSignature.split("/")[1]) || 4;
-    return Array.from(
-      { length: 12 },
-      () =>
-        generateMeasure(
-          initialBeats,
-          initialBeatValue,
-          settings.isChordMode,
-          settings.keySignature,
-        ), // Added parameter
+    return Array.from({ length: 12 }, () =>
+      generateMeasure(
+        initialBeats,
+        initialBeatValue,
+        settings.isChordMode,
+        settings.keySignature,
+        settings.complexRhythms,
+      ),
     );
   });
   const [currentMeasureIndex, setCurrentMeasureIndex] = useState(0);

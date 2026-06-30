@@ -189,6 +189,37 @@ export default function ToolBar({ settings, setSettings, onNewSheet }) {
           <span>Chords</span>
         </label>
 
+        {/* Complex Rhythms Toggle */}
+        <label
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "4px",
+            fontWeight: "500",
+            color: "var(--text-h)",
+            fontSize: "13px",
+            cursor: "pointer",
+            padding: "6px 10px",
+            borderRadius: "6px",
+            backgroundColor: "var(--code-bg, #f1f5f9)",
+          }}
+        >
+          <input
+            type="checkbox"
+            checked={settings.complexRhythms}
+            onChange={(e) =>
+              setSettings((s) => ({ ...s, complexRhythms: e.target.checked }))
+            }
+            style={{
+              accentColor: "var(--accent, #2563eb)",
+              width: "14px",
+              height: "14px",
+              cursor: "pointer",
+            }}
+          />
+          <span>Rhythms (8ths/Rests)</span>
+        </label>
+
         {/* Key Signature Dropdown */}
         <div
           style={{
