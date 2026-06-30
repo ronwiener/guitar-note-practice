@@ -147,7 +147,7 @@ export default function MusicStaff({ settings }) {
       const now = performance.now();
       let elapsed = now - startTime;
 
-      // When a measure ends, reset the clock internally WITHOUT killing the effect loop
+      // 1. SAFE MEASURE ADVANCEMENT
       if (elapsed >= msPerMeasure) {
         startTime = now;
         elapsed = 0;
@@ -156,7 +156,6 @@ export default function MusicStaff({ settings }) {
         const currentIndex = currentMeasureRef.current;
 
         if (currentIndex >= TOTAL_MEASURES - 1) {
-          // If we reached the end of the page, generate new measures and loop back to 0
           const fullSheet = Array.from({ length: TOTAL_MEASURES }, () =>
             generateMeasure(
               beats,
@@ -168,33 +167,46 @@ export default function MusicStaff({ settings }) {
           setMeasures(fullSheet);
           setCurrentMeasureIndex(0);
         } else {
-          // Move to the next measure smoothly
           setCurrentMeasureIndex(currentIndex + 1);
         }
       }
 
-      // Calculate progress layout positions using our stable ref pointer
-      const measureProgress = Math.min(elapsed / msPerMeasure, 1);
-      const row = Math.floor(currentMeasureRef.current / PER_LINE);
-      const col = currentMeasureRef.current % PER_LINE;
+      // 2. CRASH-PROOF PLAYHEAD RENDERING
+      // Checking if playheadRef.current exists right now prevents the loop from crashing during React updates
+      if (
+        !settings.isReadingMode &&
+        playheadRef.current &&
+        playheadRef.current.parentElement
+      ) {
+        try {
+          const measureProgress = Math.min(elapsed / msPerMeasure, 1);
+          const row = Math.floor(currentMeasureRef.current / PER_LINE);
+          const col = currentMeasureRef.current % PER_LINE;
 
-      const measureStartX = START_X + col * MEASURE_WIDTH;
-      const playheadX = measureStartX + measureProgress * MEASURE_WIDTH;
-      const playheadY = START_Y + row * SYSTEM_HEIGHT;
+          const measureStartX = START_X + col * MEASURE_WIDTH;
+          const playheadX = measureStartX + measureProgress * MEASURE_WIDTH;
+          const playheadY = START_Y + row * SYSTEM_HEIGHT;
 
-      // Update red tracker bar graphics (if reading mode is off)
-      if (!settings.isReadingMode && playheadRef.current) {
-        playheadRef.current.style.transform = `translate(${playheadX}px, ${playheadY}px)`;
+          playheadRef.current.style.transform = `translate(${playheadX}px, ${playheadY}px)`;
+        } catch (err) {
+          // Quietly catch temporary missing element frames during DOM shifts
+          console.warn("Playhead sync paused for frame layout update.");
+        }
       }
 
-      // Continuous Metronome click processing
+      // 3. METRONOME AUDIO MANAGEMENT
       const currentBeat = Math.floor(elapsed / msPerBeat);
       if (
         currentBeat !== lastTriggeredBeat &&
         currentBeat >= 0 &&
         currentBeat < beats
       ) {
-        playClick(currentBeat === 0);
+        // Wrap audio triggers inside a safety try/catch block
+        try {
+          playClick(currentBeat === 0);
+        } catch (audioErr) {
+          console.error("Audio Context playback interruption:", audioErr);
+        }
         lastTriggeredBeat = currentBeat;
       }
 
@@ -204,8 +216,6 @@ export default function MusicStaff({ settings }) {
     animationFrameId = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(animationFrameId);
   }, [
-    // CRITICAL FIX: currentMeasureIndex is REMOVED from here.
-    // The loop will now run infinitely without tearing down when bars advance!
     settings.tempo,
     settings.isPlaying,
     settings.isReadingMode,
