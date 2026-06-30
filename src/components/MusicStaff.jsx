@@ -119,7 +119,6 @@ export default function MusicStaff({ settings }) {
 
   // 2. Playhead Frame & Audio Timer Loop
   useEffect(() => {
-    // MODIFIED: Only exit early if we aren't playing at all.
     if (!settings.isPlaying) {
       if (playheadRef.current) {
         playheadRef.current.style.transform = `translate(${START_X}px, ${START_Y}px)`;
@@ -137,12 +136,36 @@ export default function MusicStaff({ settings }) {
     const msPerBeat = msPerMeasure / beats;
 
     const tick = () => {
-      const elapsed = performance.now() - startTime;
-      const measureProgress = Math.min(
-        (elapsed % msPerMeasure) / msPerMeasure,
-        1,
-      );
+      const now = performance.now();
+      let elapsed = now - startTime;
 
+      // Handle measure overflow cleanly
+      if (elapsed >= msPerMeasure) {
+        startTime = now; // Reset clock anchor for the brand new measure
+        elapsed = 0;
+        lastTriggeredBeat = -1; // Reset beat click index tracker
+
+        // Safely advance the index context array pointer
+        setCurrentMeasureIndex((prevIndex) => {
+          if (prevIndex >= TOTAL_MEASURES - 1) {
+            // Generate a fresh tracking canvas if we hit the end of the sheet
+            const fullSheet = Array.from({ length: TOTAL_MEASURES }, () =>
+              generateMeasure(
+                beats,
+                beatValue,
+                settings.isChordMode,
+                settings.keySignature,
+              ),
+            );
+            setMeasures(fullSheet);
+            return 0; // Wrap back around to measure 1
+          }
+          return prevIndex + 1; // Step up to the next bar
+        });
+      }
+
+      // Calculate progress layout vectors
+      const measureProgress = Math.min(elapsed / msPerMeasure, 1);
       const row = Math.floor(currentMeasureIndex / PER_LINE);
       const col = currentMeasureIndex % PER_LINE;
 
@@ -150,12 +173,13 @@ export default function MusicStaff({ settings }) {
       const playheadX = measureStartX + measureProgress * MEASURE_WIDTH;
       const playheadY = START_Y + row * SYSTEM_HEIGHT;
 
-      // MODIFIED: Only update the visual playhead position if Reading Mode is OFF
+      // Render red tracking line ONLY if reading mode is off
       if (!settings.isReadingMode && playheadRef.current) {
         playheadRef.current.style.transform = `translate(${playheadX}px, ${playheadY}px)`;
       }
 
-      const currentBeat = Math.floor((elapsed % msPerMeasure) / msPerBeat);
+      // Track sub-beat intervals and execute click sounds
+      const currentBeat = Math.floor(elapsed / msPerBeat);
       if (
         currentBeat !== lastTriggeredBeat &&
         currentBeat >= 0 &&
@@ -165,36 +189,16 @@ export default function MusicStaff({ settings }) {
         lastTriggeredBeat = currentBeat;
       }
 
-      if (elapsed >= msPerMeasure) {
-        startTime = performance.now();
-        lastTriggeredBeat = -1;
-
-        if (currentMeasureIndex >= TOTAL_MEASURES - 1) {
-          const fullSheet = Array.from({ length: TOTAL_MEASURES }, () =>
-            generateMeasure(
-              beats,
-              beatValue,
-              settings.isChordMode,
-              settings.keySignature,
-            ),
-          );
-          setMeasures(fullSheet);
-          setCurrentMeasureIndex(0);
-        } else {
-          setCurrentMeasureIndex((prev) => prev + 1);
-        }
-      }
-
       animationFrameId = requestAnimationFrame(tick);
     };
 
     animationFrameId = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(animationFrameId);
   }, [
-    currentMeasureIndex,
+    currentMeasureIndex, // Keeps loop aligned with active line state steps
     settings.tempo,
     settings.isPlaying,
-    settings.isReadingMode, // Kept in dependencies so checking/unchecking alters behavior instantly
+    settings.isReadingMode,
     settings.isChordMode,
     settings.keySignature,
     beats,
