@@ -117,7 +117,15 @@ export default function MusicStaff({ settings }) {
     });
   }, [measures, beats, beatValue, settings.timeSignature]);
 
-  // 2. Playhead Frame & Audio Timer Loop
+  // 1. Create a ref to hold the current measure index so the loop can read/write it without restarting
+  const currentMeasureRef = useRef(currentMeasureIndex);
+
+  // Keep the ref synchronized whenever the state changes
+  useEffect(() => {
+    currentMeasureRef.current = currentMeasureIndex;
+  }, [currentMeasureIndex]);
+
+  // 2. Continuous Audio & Playhead Timer Loop
   useEffect(() => {
     if (!settings.isPlaying) {
       if (playheadRef.current) {
@@ -139,46 +147,47 @@ export default function MusicStaff({ settings }) {
       const now = performance.now();
       let elapsed = now - startTime;
 
-      // Handle measure overflow cleanly
+      // When a measure ends, reset the clock internally WITHOUT killing the effect loop
       if (elapsed >= msPerMeasure) {
-        startTime = now; // Reset clock anchor for the brand new measure
+        startTime = now;
         elapsed = 0;
-        lastTriggeredBeat = -1; // Reset beat click index tracker
+        lastTriggeredBeat = -1;
 
-        // Safely advance the index context array pointer
-        setCurrentMeasureIndex((prevIndex) => {
-          if (prevIndex >= TOTAL_MEASURES - 1) {
-            // Generate a fresh tracking canvas if we hit the end of the sheet
-            const fullSheet = Array.from({ length: TOTAL_MEASURES }, () =>
-              generateMeasure(
-                beats,
-                beatValue,
-                settings.isChordMode,
-                settings.keySignature,
-              ),
-            );
-            setMeasures(fullSheet);
-            return 0; // Wrap back around to measure 1
-          }
-          return prevIndex + 1; // Step up to the next bar
-        });
+        const currentIndex = currentMeasureRef.current;
+
+        if (currentIndex >= TOTAL_MEASURES - 1) {
+          // If we reached the end of the page, generate new measures and loop back to 0
+          const fullSheet = Array.from({ length: TOTAL_MEASURES }, () =>
+            generateMeasure(
+              beats,
+              beatValue,
+              settings.isChordMode,
+              settings.keySignature,
+            ),
+          );
+          setMeasures(fullSheet);
+          setCurrentMeasureIndex(0);
+        } else {
+          // Move to the next measure smoothly
+          setCurrentMeasureIndex(currentIndex + 1);
+        }
       }
 
-      // Calculate progress layout vectors
+      // Calculate progress layout positions using our stable ref pointer
       const measureProgress = Math.min(elapsed / msPerMeasure, 1);
-      const row = Math.floor(currentMeasureIndex / PER_LINE);
-      const col = currentMeasureIndex % PER_LINE;
+      const row = Math.floor(currentMeasureRef.current / PER_LINE);
+      const col = currentMeasureRef.current % PER_LINE;
 
       const measureStartX = START_X + col * MEASURE_WIDTH;
       const playheadX = measureStartX + measureProgress * MEASURE_WIDTH;
       const playheadY = START_Y + row * SYSTEM_HEIGHT;
 
-      // Render red tracking line ONLY if reading mode is off
+      // Update red tracker bar graphics (if reading mode is off)
       if (!settings.isReadingMode && playheadRef.current) {
         playheadRef.current.style.transform = `translate(${playheadX}px, ${playheadY}px)`;
       }
 
-      // Track sub-beat intervals and execute click sounds
+      // Continuous Metronome click processing
       const currentBeat = Math.floor(elapsed / msPerBeat);
       if (
         currentBeat !== lastTriggeredBeat &&
@@ -195,7 +204,8 @@ export default function MusicStaff({ settings }) {
     animationFrameId = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(animationFrameId);
   }, [
-    currentMeasureIndex, // Keeps loop aligned with active line state steps
+    // CRITICAL FIX: currentMeasureIndex is REMOVED from here.
+    // The loop will now run infinitely without tearing down when bars advance!
     settings.tempo,
     settings.isPlaying,
     settings.isReadingMode,
