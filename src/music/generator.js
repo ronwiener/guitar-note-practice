@@ -167,13 +167,18 @@ export function generateMeasure(
   // 1. Establish duration option trees based on whether user wants complex rhythms
   let noteOptions = [];
   if (complexRhythms) {
-    // Mixes in Half, Quarters, Eighths, Quarter Rests, and Eighth Rests
+    // FIXED: Weighted pool. Notes appear frequently, rests appear rarely.
     noteOptions = [
-      { ticks: 2048, duration: "h", isRest: false },
-      { ticks: 1024, duration: "q", isRest: false },
-      { ticks: 1024, duration: "qr", isRest: true }, // Quarter Rest
+      { ticks: 2048, duration: "h", isRest: false }, // Half Note
+      { ticks: 1024, duration: "q", isRest: false }, // Quarter Note
+      { ticks: 1024, duration: "q", isRest: false }, // (Repeat to increase odds)
+      { ticks: 1024, duration: "q", isRest: false }, // (Repeat to increase odds)
       { ticks: 512, duration: "8", isRest: false }, // Eighth Note
-      { ticks: 512, duration: "8r", isRest: true }, // Eighth Rest
+      { ticks: 512, duration: "8", isRest: false }, // (Repeat to increase odds)
+
+      // Rests are restricted to just one entry each, making them rare wildcards
+      { ticks: 1024, duration: "qr", isRest: true }, // Rare Quarter Rest
+      { ticks: 512, duration: "8r", isRest: true }, // Rare Eighth Rest
     ];
   } else {
     // Standard baseline patterns (No complex subdivisions or pauses)
